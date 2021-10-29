@@ -11,7 +11,7 @@ import numpy as np
     European Regional Tracker, Germany
 --------------------------------------------------------------------------------
 """
-def ERT_germany(dtype='cases_daily', seq_len=None, country_wide_avg=False,
+def ERT_germany(dtype='cases_daily', seq_len=None, country_wide_total=False,
         per_10k_population=True, normalize=True,
         datadir='euro_regional_tracker/germany_data/data'
     ):
@@ -26,8 +26,8 @@ def ERT_germany(dtype='cases_daily', seq_len=None, country_wide_avg=False,
                        If 'None', returns the maximum sequence length
                        Default: None
 
-        country_wide_avg   : Boolean. Set to true to collapse the data into a single
-                       time series representing the average over the entire country
+        country_wide_total : Boolean. Set to true to collapse the data into a single
+                       time series representing the sum over the entire country
                        Default: False
 
         per_10k_population :
@@ -55,8 +55,8 @@ def ERT_germany(dtype='cases_daily', seq_len=None, country_wide_avg=False,
         u = u[:,:seq_len]
 
     # Compute the average over all regions
-    if country_wide_avg:
-        u = u.mean(axis=0)
+    if country_wide_total:
+        u = u.sum(axis=0)
 
     # Normalize by population
     elif per_10k_population:

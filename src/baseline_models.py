@@ -112,7 +112,7 @@ class RNN(nn.Module):
         )
 
         # Hidden initial state
-        if f_h is not 'sigmoid':
+        if f_h != 'sigmoid':
             self.h0 = nn.Parameter(
                 torch.from_numpy(2*np.random.random(size=(N_h)).astype('float32')-1)
             )
