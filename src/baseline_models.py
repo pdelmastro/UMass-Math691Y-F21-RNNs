@@ -83,6 +83,8 @@ class RNN(nn.Module):
                 activations.append(nn.Identity())
             elif f == 'softmax':
                 activations.append(nn.Softmax(dim=1))
+            elif f == 'relu':
+                activations.append(nn.LeakyReLU())
             else:
                 raise ValueError('Activation function %s not recognized' % f)
         self.f_h, self.f_out = activations
