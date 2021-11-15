@@ -1,15 +1,8 @@
 """Backend supported: tensorflow.compat.v1, tensorflow, pytorch"""
 import deepxde as dde
-import pandas as pd
 
-us_cases_df = pd.read_csv("US_Covid_Cases.csv")
-cases_series = us_cases_df.loc[:,"cases"]
-
-# Training data will be first 80% of data and Test will be last 20% of data
-n = 80
-m = 20
-fname_train = cases_series.head(int(len(cases_series)*(n/100)))
-fname_test = cases_series.tail(int(len(cases_series)*(m/100)))
+fname_train = "us_train.txt"
+fname_test = "us_test.txt"
 data = dde.data.DataSet(
     fname_train=fname_train,
     fname_test=fname_test,
