@@ -8,7 +8,7 @@ data = dde.data.DataSet(
     fname_test=fname_test,
     col_x=(0,),
     col_y=(1,),
-    #standardize=True,
+    standardize=True,
 )
 
 layer_size = [1] + [50] * 3 + [1]
