@@ -110,11 +110,7 @@ def train(network, u, y, n_epochs, batch_size, lr, lr_decay=1.0,
             optimizer.zero_grad()
 
             # Network predictions
-            rnn_out = network(u[batch_size * b : batch_size * (b+1)])
-            if isinstance(rnn_out, tuple):
-                y_pred = rnn_out[-1]
-            else:
-                y_pred = rnn_out
+            y_pred = network(u[batch_size * b : batch_size * (b+1)])
 
             # Compute loss
             loss = mse_loss(
