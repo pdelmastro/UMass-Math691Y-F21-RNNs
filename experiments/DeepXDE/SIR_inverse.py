@@ -3,33 +3,15 @@ Documentation: https://deepxde.readthedocs.io/en/latest/demos/lorenz.inverse.htm
 """
 import deepxde as dde
 import numpy as np
-import pandas as pd
-
-'''
-def gen_traindata():
-    data = pd.read_csv('SIR_dummy_data.csv')
-    data['t'] = data['t'].astype(int)
-    data['S'] = data['S'].mul(325000000)
-    data['I'] = data['I'].mul(325000000)
-    data['R'] = data['R'].mul(325000000)
-    data['S'] = data['S'].astype(int)
-    data['I'] = data['I'].astype(int)
-    data['R'] = data['R'].astype(int)
-    t_array = data['t'].to_numpy()
-    y_array = data[['S', 'I', 'R']].to_numpy()
-    return t_array, y_array
-'''
-
 
 def gen_traindata():
-    data = np.load("Lorenz.npz")
-    return data["t"], data["y"]
+    data = np.load("SIR.npz", allow_pickle = True)
+    return data['arr_0'][:, 0:1], data['arr_0'][:, 1:4]
 
 
 
 C1 = dde.Variable(1.0)
 C2 = dde.Variable(1.0)
-#C3 = dde.Variable(1.0)
 
 
 def SIR(x, y):
@@ -70,7 +52,7 @@ print(ob_y)
 data = dde.data.PDE(
     geom,
     SIR,
-    [ic1, ic2, observe_y0, observe_y1, observe_y2],
+    [ic1, ic2, ic3, observe_y0, observe_y1, observe_y2],
     num_domain=400,
     num_boundary=2,
     anchors=observe_t,
