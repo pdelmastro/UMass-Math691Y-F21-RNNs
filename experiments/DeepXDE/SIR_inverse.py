@@ -3,32 +3,49 @@ Documentation: https://deepxde.readthedocs.io/en/latest/demos/lorenz.inverse.htm
 """
 import deepxde as dde
 import numpy as np
+import pandas as pd
 
 
 def gen_traindata():
+    data = pd.read_csv('SIR_dummy_data.csv')
+    data['t'] = data['t'].astype(int)
+    data['S'] = data['S'].mul(325000000)
+    data['I'] = data['I'].mul(325000000)
+    data['R'] = data['R'].mul(325000000)
+    data['S'] = data['S'].astype(int)
+    data['I'] = data['I'].astype(int)
+    data['R'] = data['R'].astype(int)
+    t_array = data['t'].to_numpy()
+    y_array = data[['S', 'I', 'R']].to_numpy()
+    return t_array, y_array
+
+
+'''
+def gen_traindata():
     data = np.load("Lorenz.npz")
     return data["t"], data["y"]
+'''
 
 
 C1 = dde.Variable(1.0)
 C2 = dde.Variable(1.0)
-C3 = dde.Variable(1.0)
+#C3 = dde.Variable(1.0)
 
 
-def Lorenz_system(x, y):
-    """Lorenz system.
-    dy1/dx = 10 * (y2 - y1)
-    dy2/dx = y1 * (15 - y3) - y2
-    dy3/dx = y1 * y2 - 8/3 * y3
+def SIR(x, y):
+    """SIR system.
+    dy1/dx = -beta*y1*y2
+    dy2/dx = beta*y1*y2 - gamma*y2
+    dy3/dx = gamma*y2
     """
     y1, y2, y3 = y[:, 0:1], y[:, 1:2], y[:, 2:]
     dy1_x = dde.grad.jacobian(y, x, i=0)
     dy2_x = dde.grad.jacobian(y, x, i=1)
     dy3_x = dde.grad.jacobian(y, x, i=2)
     return [
-        dy1_x - C1 * (y2 - y1),
-        dy2_x - y1 * (C2 - y3) + y2,
-        dy3_x - y1 * y2 + C3 * y3,
+        dy1_x + C1 * (y2 * y1),
+        dy2_x - C1 * (y2 * y1) + C2*y2,
+        dy3_x - C2*y2,
     ]
 
 
@@ -48,11 +65,12 @@ observe_t, ob_y = gen_traindata()
 observe_y0 = dde.PointSetBC(observe_t, ob_y[:, 0:1], component=0)
 observe_y1 = dde.PointSetBC(observe_t, ob_y[:, 1:2], component=1)
 observe_y2 = dde.PointSetBC(observe_t, ob_y[:, 2:3], component=2)
-
+print(ob_y)
+'''
 data = dde.data.PDE(
     geom,
-    Lorenz_system,
-    [ic1, ic2, ic3, observe_y0, observe_y1, observe_y2],
+    SIR,
+    [ic1, ic2, observe_y0, observe_y1, observe_y2],
     num_domain=400,
     num_boundary=2,
     anchors=observe_t,
@@ -60,9 +78,10 @@ data = dde.data.PDE(
 
 net = dde.maps.FNN([1] + [40] * 3 + [3], "tanh", "Glorot uniform")
 model = dde.Model(data, net)
-model.compile("adam", lr=0.001, external_trainable_variables=[C1, C2, C3])
+model.compile("adam", lr=0.001, external_trainable_variables=[C1, C2])
 variable = dde.callbacks.VariableValue(
-    [C1, C2, C3], period=600, filename="variables.dat"
+    [C1, C2], period=600, filename="variables.dat"
 )
 losshistory, train_state = model.train(epochs=60000, callbacks=[variable])
 dde.saveplot(losshistory, train_state, issave=True, isplot=True)
+'''
