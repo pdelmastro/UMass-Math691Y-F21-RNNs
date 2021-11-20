@@ -5,7 +5,7 @@ import deepxde as dde
 import numpy as np
 import pandas as pd
 
-
+'''
 def gen_traindata():
     data = pd.read_csv('SIR_dummy_data.csv')
     data['t'] = data['t'].astype(int)
@@ -18,13 +18,13 @@ def gen_traindata():
     t_array = data['t'].to_numpy()
     y_array = data[['S', 'I', 'R']].to_numpy()
     return t_array, y_array
-
-
 '''
+
+
 def gen_traindata():
     data = np.load("Lorenz.npz")
     return data["t"], data["y"]
-'''
+
 
 
 C1 = dde.Variable(1.0)
@@ -53,7 +53,7 @@ def boundary(_, on_initial):
     return on_initial
 
 
-geom = dde.geometry.TimeDomain(0, 3)
+geom = dde.geometry.TimeDomain(0, 600)
 
 # Initial conditions
 ic1 = dde.IC(geom, lambda X: -8, boundary, component=0)
@@ -66,7 +66,7 @@ observe_y0 = dde.PointSetBC(observe_t, ob_y[:, 0:1], component=0)
 observe_y1 = dde.PointSetBC(observe_t, ob_y[:, 1:2], component=1)
 observe_y2 = dde.PointSetBC(observe_t, ob_y[:, 2:3], component=2)
 print(ob_y)
-'''
+
 data = dde.data.PDE(
     geom,
     SIR,
@@ -84,4 +84,3 @@ variable = dde.callbacks.VariableValue(
 )
 losshistory, train_state = model.train(epochs=60000, callbacks=[variable])
 dde.saveplot(losshistory, train_state, issave=True, isplot=True)
-'''
