@@ -5,7 +5,7 @@ import deepxde as dde
 import numpy as np
 
 def gen_traindata():
-    data = np.load("SIR.npz", allow_pickle = True)
+    data = np.load("SIR_normalized.npz", allow_pickle = True)
     return data['arr_0'][:, 0:1], data['arr_0'][:, 1:4]
 
 
