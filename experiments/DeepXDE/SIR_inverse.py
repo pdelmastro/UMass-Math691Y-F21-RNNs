@@ -1,8 +1,12 @@
 """Backend supported: tensorflow.compat.v1, tensorflow, pytorch
 Documentation: https://deepxde.readthedocs.io/en/latest/demos/lorenz.inverse.html
 """
-import deepxde as dde
+import re
 import numpy as np
+import requests
+import io
+import matplotlib.pyplot as plt
+import deepxde as dde
 
 def gen_traindata():
     data = np.load("SIR_normalized.npz", allow_pickle = True)
@@ -47,7 +51,13 @@ observe_t, ob_y = gen_traindata()
 observe_y0 = dde.PointSetBC(observe_t, ob_y[:, 0:1], component=0)
 observe_y1 = dde.PointSetBC(observe_t, ob_y[:, 1:2], component=1)
 observe_y2 = dde.PointSetBC(observe_t, ob_y[:, 2:3], component=2)
-print(ob_y)
+'''
+plt.plot(observe_t, ob_y)
+plt.xlabel("Time")
+plt.legend(["S", "I", "R"])
+plt.title("Training data")
+plt.show()
+'''
 
 data = dde.data.PDE(
     geom,
@@ -61,8 +71,48 @@ data = dde.data.PDE(
 net = dde.maps.FNN([1] + [40] * 3 + [3], "tanh", "Glorot uniform")
 model = dde.Model(data, net)
 model.compile("adam", lr=0.001, external_trainable_variables=[C1, C2])
+# callbacks for storing results
+fnamevar = "variables.dat"
 variable = dde.callbacks.VariableValue(
-    [C1, C2], period=600, filename="variables.dat"
+    [C1, C2], period=600, filename=fnamevar
 )
 losshistory, train_state = model.train(epochs=60000, callbacks=[variable])
-dde.saveplot(losshistory, train_state, issave=True, isplot=True)
+#dde.saveplot(losshistory, train_state, variable, issave=True, isplot=True)
+
+# reopen saved data using callbacks in fnamevar
+lines = open(fnamevar, "r").readlines()
+
+# read output data in fnamevar (this line is a long story...)
+Chat = np.array(
+    [
+        np.fromstring(
+            min(re.findall(re.escape("[") + "(.*?)" + re.escape("]"), line), key=len),
+            sep=",",
+        )
+        for line in lines
+    ]
+)
+
+l, c = Chat.shape
+
+C1true = 3/14
+C2true = 1/14
+
+plt.plot(range(l), Chat[:, 0], "r-")
+plt.plot(range(l), Chat[:, 1], "k-")
+#plt.plot(range(l), Chat[:, 2], "g-")
+plt.plot(range(l), np.ones(Chat[:, 0].shape) * C1true, "r--")
+plt.plot(range(l), np.ones(Chat[:, 1].shape) * C2true, "k--")
+#plt.plot(range(l), np.ones(Chat[:, 2].shape) * C3true, "g--")
+plt.legend(["C1hat", "C2hat", "True C1", "True C2"], loc="right")
+plt.xlabel("Epoch")
+plt.show()
+
+
+yhat = model.predict(observe_t)
+
+plt.plot(observe_t, ob_y, "-", observe_t, yhat, "--")
+plt.xlabel("Time")
+plt.legend(["S", "I", "R", "Sh", "Ih", "Rh"])
+plt.title("Training data")
+plt.show()
