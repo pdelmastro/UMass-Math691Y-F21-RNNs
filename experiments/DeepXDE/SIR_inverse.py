@@ -77,8 +77,8 @@ variable = dde.callbacks.VariableValue(
     [C1, C2], period=600, filename=fnamevar
 )
 losshistory, train_state = model.train(epochs=60000, callbacks=[variable])
-#dde.saveplot(losshistory, train_state, variable, issave=True, isplot=True)
-
+dde.saveplot(losshistory, train_state, issave=True, isplot=True)
+'''
 # reopen saved data using callbacks in fnamevar
 lines = open(fnamevar, "r").readlines()
 
@@ -117,3 +117,4 @@ plt.xlabel("Time")
 plt.legend(["S", "I", "R", "Sh", "Ih", "Rh"])
 plt.title("Training data")
 plt.show()
+'''
