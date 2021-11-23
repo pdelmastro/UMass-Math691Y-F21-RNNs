@@ -112,6 +112,7 @@ plt.show()
 yhat = model.predict(observe_t)
 
 plt.plot(observe_t, ob_y, "-", observe_t, yhat, "--")
+plt.ylim(0,1)
 plt.xlabel("Time")
 plt.legend(["S", "I", "R", "Sh", "Ih", "Rh"])
 plt.title("Training data")
