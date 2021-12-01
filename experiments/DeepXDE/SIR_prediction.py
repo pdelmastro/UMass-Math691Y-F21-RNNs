@@ -11,20 +11,21 @@ df = pd.read_csv('SIR.csv')
 df = df.head(327)
 us_pop = 333000000
 
-df['Susceptible'] = us_pop - df['Recovered [R]'] - df['Infected [C - R]']
+immediate_cases = []
+for i in range(len(df['Cases [C]'])):
+    if i is 0:
+        continue
+    immediate_cases.append(df['Cases [C]'][i]-df['Cases [C]'][i-1])
+
+df = df.head(326)
+df['I Vals'] = pd.Series(immediate_cases)
+df['Susceptible'] = us_pop - df['Recovered [R]'] - df['I Vals']
 days_list = list(range(0,len(df['Susceptible'])))
 df['Days'] = pd.Series(days_list)
 df['S'] = df['Susceptible']/us_pop
-df['I'] = df['Infected [C - R]']/us_pop
+df['I'] = df['I Vals']/us_pop
 df['R'] = df['Recovered [R]']/us_pop
 
-'''
-#plt.plot(df['Days'], df['Susceptible'], label = 'S')
-plt.plot(df['Days'], df['Infected [C - R]'], label = 'I')
-plt.plot(df['Days'], df['Recovered [R]'], label = 'R')
-plt.legend()
-plt.show()
-'''
 
 t_array = df['Days'].to_numpy()
 y_array = df[['S','I','R']].to_numpy()
