@@ -91,28 +91,13 @@ variable = dde.callbacks.VariableValue(
     [C1, C2], period=600, filename=fnamevar
 )
 losshistory, train_state = model.train(epochs=60000, callbacks=[variable])
-dde.saveplot(losshistory, train_state, issave=True, isplot=True)
+#dde.saveplot(losshistory, train_state, issave=True, isplot=True)
 
-# reopen saved data using callbacks in fnamevar
-lines = open(fnamevar, "r").readlines()
-
-# read output data in fnamevar (this line is a long story...)
-Chat = np.array(
-    [
-        np.fromstring(
-            min(re.findall(re.escape("[") + "(.*?)" + re.escape("]"), line), key=len),
-            sep=",",
-        )
-        for line in lines
-    ]
-)
-
-l, c = Chat.shape
 yhat = model.predict(observe_t)
 
-plt.plot(observe_t, ob_y, "-", observe_t, yhat, "--")
+plt.plot(observe_t, ob_y[:, 1:2], "-", observe_t, yhat[:, 1:2], "--")
 plt.ylim(0,1)
 plt.xlabel("Time")
-plt.legend(["S", "I", "R", "Sh", "Ih", "Rh"])
-plt.title("Training data")
+plt.legend(["I","Ih"])
+plt.title("Real I vs Training data I for SIR")
 plt.show()
