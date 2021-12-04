@@ -21,7 +21,8 @@ df = df.head(326)
 df['I Vals'] = pd.Series(immediate_cases)
 
 # Model does really bad with the multiple peaks but what about with just one
-df = df.head(120)
+df = df.head(170)
+df = df.tail(120)
 
 df['Susceptible'] = us_pop - df['Recovered [R]'] - df['I Vals']
 days_list = list(range(0,len(df['Susceptible'])))
@@ -30,11 +31,13 @@ df['S'] = df['Susceptible']/us_pop
 df['I'] = df['I Vals']/us_pop
 df['R'] = df['Recovered [R]']/us_pop
 
-
 t_array = df['Days'].to_numpy()
 y_array = df[['S','I','R']].to_numpy()
 concat = np.column_stack([t_array, y_array])
 
+plt.plot(t_array, y_array, label= ['S','I','R'])
+plt.legend()
+plt.show()
 
 def gen_traindata():
     return concat[:,0:1], concat[:,1:4]
