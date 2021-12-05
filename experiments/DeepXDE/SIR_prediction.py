@@ -21,8 +21,8 @@ df = df.head(326)
 df['I Vals'] = pd.Series(immediate_cases)
 
 # Model does really bad with the multiple peaks but what about with just one
-df = df.head(170)
-df = df.tail(120)
+# df = df.head(170)
+# df = df.tail(120)
 
 df['Susceptible'] = us_pop - df['Recovered [R]'] - df['I Vals']
 days_list = list(range(0,len(df['Susceptible'])))
