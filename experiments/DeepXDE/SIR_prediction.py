@@ -35,10 +35,6 @@ t_array = df['Days'].to_numpy()
 y_array = df[['S','I','R']].to_numpy()
 concat = np.column_stack([t_array, y_array])
 
-plt.plot(t_array, y_array, label= ['S','I','R'])
-plt.legend()
-plt.show()
-
 def gen_traindata():
     return concat[:,0:1], concat[:,1:4]
 
@@ -67,12 +63,12 @@ def boundary(_, on_initial):
     return on_initial
 
 
-geom = dde.geometry.TimeDomain(0, 600)
+geom = dde.geometry.TimeDomain(0, 350)
 
 # Initial conditions
-ic1 = dde.IC(geom, lambda X: -8, boundary, component=0)
-ic2 = dde.IC(geom, lambda X: 7, boundary, component=1)
-ic3 = dde.IC(geom, lambda X: 27, boundary, component=2)
+ic1 = dde.IC(geom, lambda X: 1, boundary, component=0)
+ic2 = dde.IC(geom, lambda X: 0.0001, boundary, component=1)
+ic3 = dde.IC(geom, lambda X: 0, boundary, component=2)
 
 # Get the train data
 observe_t, ob_y = gen_traindata()
