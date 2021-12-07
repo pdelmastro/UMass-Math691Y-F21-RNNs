@@ -21,8 +21,7 @@ df = df.head(326)
 df['I Vals'] = pd.Series(immediate_cases)
 
 # Model does really bad with the multiple peaks but what about with just one
-# df = df.head(170)
-# df = df.tail(120)
+# df = df.iloc[50:326]
 
 df['Susceptible'] = us_pop - df['Recovered [R]'] - df['I Vals']
 days_list = list(range(0,len(df['Susceptible'])))
@@ -63,12 +62,12 @@ def boundary(_, on_initial):
     return on_initial
 
 
-geom = dde.geometry.TimeDomain(0, 350)
+geom = dde.geometry.TimeDomain(0, 326)
 
 # Initial conditions
-ic1 = dde.IC(geom, lambda X: 1, boundary, component=0)
-ic2 = dde.IC(geom, lambda X: 0.0001, boundary, component=1)
-ic3 = dde.IC(geom, lambda X: 0, boundary, component=2)
+ic1 = dde.IC(geom, lambda X: float(df['S'][0]), boundary, component=0)
+ic2 = dde.IC(geom, lambda X: float(df['I'][0]), boundary, component=1)
+ic3 = dde.IC(geom, lambda X: float(df['R'][0]), boundary, component=2)
 
 # Get the train data
 observe_t, ob_y = gen_traindata()
@@ -99,7 +98,6 @@ losshistory, train_state = model.train(epochs=60000, callbacks=[variable])
 yhat = model.predict(observe_t)
 
 plt.plot(observe_t, ob_y[:, 1:2], "-", observe_t, yhat[:, 1:2], "--")
-plt.ylim(0,1)
 plt.xlabel("Time")
 plt.legend(["I","Ih"])
 plt.title("Real I vs Training data I for SIR")
