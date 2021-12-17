@@ -62,12 +62,12 @@ def boundary(_, on_initial):
     return on_initial
 
 
-geom = dde.geometry.TimeDomain(0, 326)
+geom = dde.geometry.TimeDomain(50, 326)
 
 # Initial conditions
-ic1 = dde.IC(geom, lambda X: float(df['S'][0]), boundary, component=0)
-ic2 = dde.IC(geom, lambda X: float(df['I'][0]), boundary, component=1)
-ic3 = dde.IC(geom, lambda X: float(df['R'][0]), boundary, component=2)
+ic1 = dde.IC(geom, lambda X: float(df['S'][50]), boundary, component=0)
+ic2 = dde.IC(geom, lambda X: float(df['I'][50]), boundary, component=1)
+ic3 = dde.IC(geom, lambda X: float(df['R'][50]), boundary, component=2)
 
 # Get the train data
 observe_t, ob_y = gen_traindata()
