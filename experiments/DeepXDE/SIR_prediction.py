@@ -9,15 +9,16 @@ import deepxde as dde
 df = pd.read_csv('SIR.csv')
 
 df = df.head(327)
+df = df.tail(277)
 us_pop = 333000000
 
 immediate_cases = []
 for i in range(len(df['Cases [C]'])):
     if i is 0:
         continue
-    immediate_cases.append(df['Cases [C]'][i]-df['Cases [C]'][i-1])
+    immediate_cases.append(df['Cases [C]'].iloc[i]-df['Cases [C]'].iloc[i-1])
 
-df = df.head(326)
+df = df.head(276)
 df['I Vals'] = pd.Series(immediate_cases)
 
 # Model does really bad with the multiple peaks but what about with just one
@@ -62,12 +63,12 @@ def boundary(_, on_initial):
     return on_initial
 
 
-geom = dde.geometry.TimeDomain(50, 326)
+geom = dde.geometry.TimeDomain(0, 276)
 
 # Initial conditions
-ic1 = dde.IC(geom, lambda X: float(df['S'][50]), boundary, component=0)
-ic2 = dde.IC(geom, lambda X: float(df['I'][50]), boundary, component=1)
-ic3 = dde.IC(geom, lambda X: float(df['R'][50]), boundary, component=2)
+ic1 = dde.IC(geom, lambda X: float(df['S'][0]), boundary, component=0)
+ic2 = dde.IC(geom, lambda X: float(df['I'][0]), boundary, component=1)
+ic3 = dde.IC(geom, lambda X: float(df['R'][0]), boundary, component=2)
 
 # Get the train data
 observe_t, ob_y = gen_traindata()
