@@ -8,8 +8,7 @@ import deepxde as dde
 
 df = pd.read_csv('SIR.csv')
 
-df = df.head(327)
-df = df.tail(277)
+df = df.iloc[50:150]
 us_pop = 333000000
 
 immediate_cases = []
@@ -18,7 +17,7 @@ for i in range(len(df['Cases [C]'])):
         continue
     immediate_cases.append(df['Cases [C]'].iloc[i]-df['Cases [C]'].iloc[i-1])
 
-df = df.head(276)
+df = df.head(100)
 df['I Vals'] = pd.Series(immediate_cases)
 
 # Model does really bad with the multiple peaks but what about with just one
@@ -30,7 +29,7 @@ df['Days'] = pd.Series(days_list)
 df['S'] = df['Susceptible']/us_pop
 df['I'] = df['I Vals']/us_pop
 df['R'] = df['Recovered [R]']/us_pop
-
+print(df)
 t_array = df['Days'].to_numpy()
 y_array = df[['S','I','R']].to_numpy()
 concat = np.column_stack([t_array, y_array])
@@ -63,7 +62,7 @@ def boundary(_, on_initial):
     return on_initial
 
 
-geom = dde.geometry.TimeDomain(0, 276)
+geom = dde.geometry.TimeDomain(0, 100)
 
 # Initial conditions
 ic1 = dde.IC(geom, lambda X: float(df['S'][0]), boundary, component=0)
