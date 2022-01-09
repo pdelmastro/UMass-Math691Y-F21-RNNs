@@ -20,9 +20,6 @@ for i in range(len(df['Cases [C]'])):
 df = df.head(326)
 df['I Vals'] = pd.Series(immediate_cases)
 
-# Model does really bad with the multiple peaks but what about with just one
-df = df.iloc[50:150]
-print(df)
 
 df['Susceptible'] = us_pop - df['Recovered [R]'] - df['I Vals']
 days_list = list(range(0,len(df['Susceptible'])))
@@ -30,9 +27,23 @@ df['Days'] = pd.Series(days_list)
 df['S'] = df['Susceptible']/us_pop
 df['I'] = df['I Vals']/us_pop
 df['R'] = df['Recovered [R]']/us_pop
-print(df)
-t_array = df['Days'].to_numpy()
-y_array = df[['S','I','R']].to_numpy()
+
+# Let's focus on one peak from day 50 to day 150
+df_sub = df.iloc[50:150]
+days_list = []
+s_list = []
+i_list = []
+r_list = []
+for i in range(len(df_sub)):
+    days_list.append(df['Days'].iloc[i+50])
+    s_list.append(df['S'].iloc[i])
+    i_list.append(df['I'].iloc[i])
+    r_list.append(df['R'].iloc[i])
+
+new_df = pd.DataFrame(list(zip(days_list,s_list,i_list,r_list)), 
+    columns=['Days', 'S', 'I', 'R'])
+t_array = new_df['Days'].to_numpy()
+y_array = new_df[['S','I','R']].to_numpy()
 concat = np.column_stack([t_array, y_array])
 
 def gen_traindata():
@@ -66,9 +77,9 @@ def boundary(_, on_initial):
 geom = dde.geometry.TimeDomain(50, 150)
 
 # Initial conditions
-ic1 = dde.IC(geom, lambda X: float(df['S'][50]), boundary, component=0)
-ic2 = dde.IC(geom, lambda X: float(df['I'][50]), boundary, component=1)
-ic3 = dde.IC(geom, lambda X: float(df['R'][50]), boundary, component=2)
+ic1 = dde.IC(geom, lambda X: float(new_df['S'][0]), boundary, component=0)
+ic2 = dde.IC(geom, lambda X: float(new_df['I'][0]), boundary, component=1)
+ic3 = dde.IC(geom, lambda X: float(new_df['R'][0]), boundary, component=2)
 
 # Get the train data
 observe_t, ob_y = gen_traindata()
