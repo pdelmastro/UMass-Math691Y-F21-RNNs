@@ -4,6 +4,7 @@ from torch import optim
 import matplotlib.pyplot as plt
 from torch.autograd import Variable
 import numpy as np
+import matplotlib.gridspec as gridspec
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
@@ -53,7 +54,7 @@ def initialization(sample_size):
     return x,u_initial,u_boundary_left,u_boundary_right
 
 
-# the initial condition is u(x,0) = 6sin(pi*x)
+# the initial condition is u(x,0) = sin(2*pi*x)
 # u(0,t) = u(1,t) = 0
 # x in [0,1]
 # t in [0,1]
@@ -90,7 +91,7 @@ def main():
 
 
         #loss function:
-        loss1 = loss_fun(net(u_initial),6*torch.sin(np.pi*x_train))
+        loss1 = loss_fun(net(u_initial),torch.sin(2*np.pi*x_train))
         # computing the loss of u(x,0)
 
         loss2 = loss_fun(net(u_boundary_left),torch.zeros(sample_size,1))
@@ -109,7 +110,9 @@ def main():
 
             # plotting
             fig = plt.figure()
-            ax = plt.axes(projection='3d')
+            G = gridspec.GridSpec(3, 2)
+            ax1 = fig.add_subplot(G[0:2,0], projection='3d')
+            ax2 = fig.add_subplot(G[0:2,1], projection='3d')
             x = np.linspace(0,1,sample_size)
             t = np.linspace(0,1,sample_size)
             temp = np.empty((2,1))
@@ -122,14 +125,19 @@ def main():
                     pred[i][j] = net(ctemp).detach().numpy()
             X,T = np.meshgrid(x,t,indexing = 'ij')
             pred = np.reshape(pred,(t.shape[0],x.shape[0]))
-            ax.plot_surface(X,T,pred)
-            ax.set_xlabel('x')
-            ax.set_ylabel('t')
-            ax.set_zlabel('u')
+            ax1.plot_surface(X,T,pred)
+            ax2.plot_surface(X,T,np.sin(2*np.pi*X)*np.exp((-4*np.pi**2)*T))
+            ax1.set_xlabel('x')
+            ax1.set_ylabel('t')
+            ax1.set_zlabel('u')
+            ax2.set_xlabel('x')
+            ax2.set_ylabel('t')
+            ax2.set_zlabel('u')
+            plt.title(f'Predicted (left) vs True Solution (right) at  u = sin(2*pi*x)e^(-4*pi**2)t')
             plt.show()
 
     torch.save(net.state_dict(),'1D_heat_equation.pt')
 if __name__ == '__main__':
     main()
 
-# the exact solution is u = 6sin(pi*x)e^(pi**2)t
+# the exact solution is u = sin(2*pi*x)e^(-4*pi**2)t
