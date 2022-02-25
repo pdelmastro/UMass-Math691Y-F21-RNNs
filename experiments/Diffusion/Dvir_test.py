@@ -136,7 +136,7 @@ def main():
             plt.title(f'Predicted (left) vs True Solution (right) at  u = sin(2*pi*x)e^(-4*pi**2)t')
             plt.show()
 
-    torch.save(net.state_dict(),'1D_heat_equation.pt')
+    torch.save(net.state_dict(),'1D_heat_equation_Dvir.pt')
 if __name__ == '__main__':
     main()
 
