@@ -87,6 +87,7 @@ def main():
         du = torch.autograd.grad(net(x_train), x_train, grad_outputs=torch.ones_like(net(x_train)), create_graph=True)
         ux = du[0][:,0].unsqueeze(-1)
         ut = du[0][:,1].unsqueeze(-1)
+        a=1
         uxx = torch.autograd.grad(ux, x_train, grad_outputs=torch.ones_like(ux), create_graph=True)[0][:,0].unsqueeze(-1)
         #y_train = net(x_train)
 
@@ -101,7 +102,7 @@ def main():
         loss3 = loss_fun(net(u_boundary_right),torch.zeros([sample_size,1]))
         #computing the loss of u(1,t)
 
-        loss4 = loss_fun(ut-uxx,torch.zeros([sample_size,1]))
+        loss4 = loss_fun(ut-a*ux,torch.zeros([sample_size,1]))
 
         loss = loss1+loss2+loss3+loss4
         loss.backward()
@@ -114,7 +115,7 @@ def main():
             G = gridspec.GridSpec(3, 3)
             ax1 = fig.add_subplot(G[0:2,0], projection='3d')
             ax2 = fig.add_subplot(G[0:2,1], projection='3d')
-            ax3 = fig.add_subplot(G[0:2,2], projection='3d')
+            # ax3 = fig.add_subplot(G[0:2,2], projection='3d')
             x = np.linspace(0,1,sample_size)
             t = np.linspace(0,1,sample_size)
             temp = np.empty((2,1))
@@ -127,21 +128,22 @@ def main():
                     pred[i][j] = net(ctemp).detach().numpy()
             X,T = np.meshgrid(x,t,indexing = 'ij')
             pred = np.reshape(pred,(t.shape[0],x.shape[0]))
-            u = np.sin(2*np.pi*X)*np.exp((-4*np.pi**2)*T)
-            diff = u-pred
+            u = np.sin(2*np.pi*(X-T)) 
+            #*np.exp((-4*np.pi**2)*T)
+            # diff = u-pred
             ax1.plot_surface(X,T,pred)
             ax2.plot_surface(X,T,u)
-            ax3.plot_surface(X,T,diff)
+            # ax3.plot_surface(X,T,diff)
             ax1.set_xlabel('x')
             ax1.set_ylabel('t')
             ax1.set_zlabel('u')
             ax2.set_xlabel('x')
             ax2.set_ylabel('t')
             ax2.set_zlabel('u')
-            ax3.set_xlabel('x')
-            ax3.set_ylabel('t')
-            ax3.set_zlabel('u')
-            plt.title('Network Solution (left), True Solution (center), Difference of Solutions (right)')
+            # ax3.set_xlabel('x')
+            # ax3.set_ylabel('t')
+            # ax3.set_zlabel('u')
+            plt.title('Network Solution (left), True Solution (right)')
             plt.show()
 
     torch.save(net.state_dict(),'1D_heat_equation_Dvir.pt')
