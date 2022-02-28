@@ -70,6 +70,7 @@ def main():
     net = PINN(2,100).to(device)
     optimizer = optim.Adam(net.parameters())
     loss_fun = nn.MSELoss(reduce='mean')
+    
 
 
   # training
@@ -110,9 +111,10 @@ def main():
 
             # plotting
             fig = plt.figure()
-            G = gridspec.GridSpec(3, 2)
+            G = gridspec.GridSpec(3, 3)
             ax1 = fig.add_subplot(G[0:2,0], projection='3d')
             ax2 = fig.add_subplot(G[0:2,1], projection='3d')
+            ax3 = fig.add_subplot(G[0:2,2], projection='3d')
             x = np.linspace(0,1,sample_size)
             t = np.linspace(0,1,sample_size)
             temp = np.empty((2,1))
@@ -125,15 +127,20 @@ def main():
                     pred[i][j] = net(ctemp).detach().numpy()
             X,T = np.meshgrid(x,t,indexing = 'ij')
             pred = np.reshape(pred,(t.shape[0],x.shape[0]))
+            u = np.sin(2*np.pi*X)*np.exp((-4*np.pi**2)*T)
             ax1.plot_surface(X,T,pred)
-            ax2.plot_surface(X,T,np.sin(2*np.pi*X)*np.exp((-4*np.pi**2)*T))
+            ax2.plot_surface(X,T,u)
+            ax2.plot_surface(X,T,u-pred)
             ax1.set_xlabel('x')
             ax1.set_ylabel('t')
             ax1.set_zlabel('u')
             ax2.set_xlabel('x')
             ax2.set_ylabel('t')
             ax2.set_zlabel('u')
-            plt.title(f'Predicted (left) vs True Solution (right) at  u = sin(2*pi*x)e^(-4*pi**2)t')
+            ax3.set_xlabel('x')
+            ax3.set_ylabel('t')
+            ax3.set_zlabel('u')
+            plt.title('Network Solution (left), True Solution (center), Difference of Solutions (right)')
             plt.show()
 
     torch.save(net.state_dict(),'1D_heat_equation_Dvir.pt')
