@@ -128,9 +128,10 @@ def main():
             X,T = np.meshgrid(x,t,indexing = 'ij')
             pred = np.reshape(pred,(t.shape[0],x.shape[0]))
             u = np.sin(2*np.pi*X)*np.exp((-4*np.pi**2)*T)
+            diff = u-pred
             ax1.plot_surface(X,T,pred)
             ax2.plot_surface(X,T,u)
-            ax2.plot_surface(X,T,u-pred)
+            ax3.plot_surface(X,T,diff)
             ax1.set_xlabel('x')
             ax1.set_ylabel('t')
             ax1.set_zlabel('u')
