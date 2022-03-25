@@ -7,15 +7,7 @@ import torch
 import torch.nn
 
 # Local imports
-from mesh import generate_mesh
-
-
-"""
---------------------------------------------------------------------------------
-    Boundary Condition Functions
---------------------------------------------------------------------------------
-"""
-
+from .mesh import generate_mesh
 
 
 """
@@ -23,7 +15,6 @@ from mesh import generate_mesh
     Generic PINN Optimizer
 --------------------------------------------------------------------------------
 """
-
 class PINN_Optimizer(object):
 
     """
@@ -34,22 +25,110 @@ class PINN_Optimizer(object):
     def __init__(self):
         pass
 
-
-    def setup(*args, **kwargs):
+    def setup(self, *args, **kwargs):
         """
-        TODO: explain
+        Sets up various data structures used by the optimizer during the
+        training loop (self.train())
         """
         pass
+
 
     """
     ----------------------------------------------------------------------------
         Domain Sampling Functions
-
-    next_t0_condition
-    something to do with the boundary
-    next_interior_points
     ----------------------------------------------------------------------------
     """
+    def next_t0_condition(self, *args, **kwargs):
+        """
+        Returns a tuple of data used for evaluating the initial condition
+        residuals on the next iteration of training
+
+        ARGUMENTS
+
+            None required by this class. The error based sampling optimizer
+            is the only class that needs arguments for this function.
+
+        RETURNS
+
+            t0_points       :   (# points, self.d+1)-Torch tensor. Points at
+                                which the initial condition is to be evaluated.
+                                These are pairs t0_points[i] = [t[i]; x[i]]
+
+            u_exact_t0      :   (# points, 1)-Torch tensor. Initial condition at
+                                t=t[i], x=x[i]
+        """
+        pass
+
+
+    def next_boundary_condition(self, *args, **kwargs):
+        """
+        Returns a tuple of data used for evaluating the boundary condition
+        residuals on the next iteration of training.
+
+        ARGUMENTS
+
+            None required by this class. The error based sampling optimizer
+            is the only class that needs arguments for this function.
+
+        RETURNS
+
+            t0_points       :   (# points, self.d+1)-Torch tensor. Points at
+                                which the initial condition is to be evaluated.
+                                These are pairs t0_points[i] = [t[i]; x[i]]
+
+            u_exact_t0      :   (# points, 1)-Torch tensor. Initial condition at
+                                t=t[i], x=x[i]
+        """
+        pass
+
+
+    def next_boundary_pairs(self, *args, **kwargs):
+        """
+        Returns the boundary points of the domain at which the BC residuals
+        will be evaluated on the next iteration of training. This function is
+        used when imposing periodic boundary conditions.
+
+        ARGUMENTS
+
+            None required by this class. The error based sampling optimizer
+            is the only class that needs arguments for this function.
+
+        RETURNS
+
+            bndry_pts   :       (P, self.d+1)-Torch tensor. Points at which the
+                                  periodic BC residuals will be evaluated.
+                                  These are pairs
+                                        bndry_pts[i] = [t[i]; x_bndry[i]]
+
+            opp_pts     :       (P, self.d+1)-Torch tensor. Points at which are
+                                  on the boundary opposite from 'bndry_pts'
+                                  These are pairs
+                                        opp_pts[i] = [t[i]; x_opp[i]],
+                                  where position x_opp[i] is on the opposite
+                                  boundary from position x_bndry[i].
+                                For instance, in the 1d case, if
+                                    x_bndry[i] = 0 then x_opp[i] = 1.
+        """
+        pass
+
+
+    def next_interior_points(self, *args, **kwargs):
+        """
+        Returns the interior points of the domain at which the PDE residuals
+        will be evaluated on the next iteration of training
+
+        ARGUMENTS
+
+            None required by this class. The error based sampling optimizer
+            is the only class that needs arguments for this function.
+
+        RETURNS
+
+            interior_pts   :   (# points, self.d+1)-Torch tensor. Points at
+                                which the PDE residuals will be evaluated.
+                                These are pairs interior_pts[i] = [t[i]; x[i]]
+        """
+        pass
 
 
 
@@ -167,6 +246,8 @@ class PINN_Optimizer(object):
 
         TODO
         - Add option to control time T
+        - Add option to set initial condition for u_t (needed for wave eqn)
+        - Add cosine learning rate scheduler
         """
         # Loss coefs alpha[i]
         if alpha is None:
@@ -181,9 +262,10 @@ class PINN_Optimizer(object):
         L_bc = np.zeros(n_iters)     # Initial condition loss
         L_ic = np.zeros(n_iters)     # Initial condition loss
         L_train = np.zeros(n_iters)  # Overall training loss
-        if u_exact is not None:
+        if f_u_exact is not None:
             L2_err = np.zeros(n_iters)  # L2-error on exact solution
             # Generate the evaluation mesh
+            nt_ev,nx_ev = eval_mesh_size
             eval_mesh = generate_mesh(nt_ev, nx_ev)
             # Exact solution on the mesh
             u_exact_eval = [f_u_exact(pts) for pts in eval_mesh]
@@ -211,50 +293,46 @@ class PINN_Optimizer(object):
             # Case 1: Periodic BCs
             if f_bc is None:
                 # Get pairs of points from the boundary
-                bndry_pts = self.next_boundary_pairs()
+                bndry_pts, opp_bndry_pts = self.next_boundary_pairs()
                 # Compute the network's output on these boundary points
                 u_net_bndry = network(bndry_pts)
+                u_net_opp_bndry = network(opp_bndry_pts)
                 # Compute the residuals
-                u_net_bndry1 = u_net_bndry[:u_net_bndry.shape[0]//2]
-                u_net_bndry2 = u_net_bndry[u_net_bndry.shape[0]//2:]
-                res_bc_i = u_net_bndry1 - u_net_bndry2
+                res_bc_i = u_net_bndry - u_net_opp_bndry
             # Case 2: Dirichlet BCs
             else:
                 # Get the set of points at which the initial condition loss
                 # will be evaluated, as well as the exact solution at these pts
-                bndry_pts, u_exact_bndry = self.next_bndry_condition(f_bc)
+                bndry_pts, u_exact_bndry = self.next_boundary_condition(f_bc)
                 # Compute the network's predictons for these points
                 u_net_bndry = network(bndry_pts)
                 # Initial condition loss
-                res_ic_i = u_exact_t0 - u_net_t0
+                res_bc_i = u_exact_bndry - u_net_bndry
             # Compute the loss based on the residuals
             L_bc_i = res_bc_i.square().mean()
             L_bc[i] = L_bc_i.detach()
 
-            u_net_left_bndry = u_net_bndry[:n_bndry_pts//2]
-            u_net_right_bndry = u_net_bndry[n_bndry_pts//2:]
-
             # PDE loss
             # Get the set of points at which the PDE loss will be evaluated
-            interior_pts = self.next_interior_points(i)
+            interior_pts = self.next_interior_points()
             # Compute the NN's output at the interior points
-            u_net_interior = network(mesh_interior)
+            u_net_interior = network(interior_pts)
             # Compute the NN's PDE loss
-            res_pde_i = f_pde(mesh_interior, u_net_interior)
+            res_pde_i = f_pde(interior_pts, u_net_interior)
             L_pde_i = res_pde_i.square().mean()
             L_pde[i] = L_pde_i.detach()
 
             # L2 Error on exact solution
-            if u_exact is not None:
+            if f_u_exact is not None:
                 # Compute the network's output on the evaluation mesh
                 with torch.no_grad():
-                    u_net_eval_i = [network(pts) for pts in eval_mesh]
+                    u_net_eval = [network(pts) for pts in eval_mesh]
                 # Compute the L2-error
                 L2s_eval_i = [
                     (u_net-u_exact).square().mean()
-                    for u_net, u_exact in zip(u_net_eval_i, u_exact_eval)
+                    for u_net, u_exact in zip(u_net_eval, u_exact_eval)
                 ]
-                L2_err[i] = torch.sqrt(sum(eval_L2s_i))
+                L2_err[i] = torch.sqrt(sum(L2s_eval_i))
 
             # Overall loss
             L_train_i = alpha[0] * L_pde_i + alpha[1] * L_bc_i + alpha[2] * L_ic_i
@@ -266,17 +344,17 @@ class PINN_Optimizer(object):
 
             # Post-iteration updated based on the losses
             # This functionality is used by the error-based training algorithm
-            self.step(
-                # TODO: figure out what to pass here
-                # Will need to include the residuals res_XX_i, but what
-                # else needs to be included?
-            )
+            # self.step(
+            #     # TODO: figure out what to pass here
+            #     # Will need to include the residuals res_XX_i, but what
+            #     # else needs to be included?
+            # )
 
             # Progress update
             if verbose and ((i == 0) or ((i+1) % verbose) == 0):
                 fmt_str = 'Iter %d/%d, Losses: PDE=%.2e  BC=%.2e  IC=%.2e  TR=%.2e'
                 msg = fmt_str % (i+1, n_iters, L_pde_i, L_bc_i, L_ic_i, L_train_i)
-                if u_exact is not None:
+                if f_u_exact is not None:
                     msg += ' L2-err: %.2e' % L2_err[i]
                 print(msg)
 
@@ -284,7 +362,7 @@ class PINN_Optimizer(object):
             if make_pred_figs and ((i == 0) or ((i+1) % make_pred_figs) == 0):
                 # Make the figure
                 fig, axs = visualize_predictions(
-                    network, u_exact, n_t_viz, n_x_viz,
+                    network, f_u_exact, n_t_viz, n_x_viz,
                     suptitle='Training Iteration %d' % (i+1),
                     f_pde=f_pde, plot_types=['pred', 'pde_res', 'res']
                 )
@@ -296,10 +374,9 @@ class PINN_Optimizer(object):
                 # Close the figure
                 plt.close()
 
-
         # Return the loss arrays as np arrays
         losses = [L_pde, L_bc, L_ic, L_train]
-        if u_exact is not None:
+        if f_u_exact is not None:
             losses.append(L2_err)
         return losses
 
@@ -338,22 +415,31 @@ class MeshBasedOptimizer(PINN_Optimizer):
 
         # Create the training mesh
         mesh = generate_mesh(nt, nx, d, T)
-        self.mesh_t0, self.mesh_bndry, self.mesh_interior = mesh
+        self.mesh_interior, self.mesh_bndry, self.mesh_t0 = mesh
         # Set the interior points to requires grad
         self.mesh_interior.requires_grad = True
 
+        # Variables storing the number of training points for each part
+        # of the mesh
+        self.n_pde_pts = self.mesh_interior.shape[0]
+        self.n_bc_pts = self.mesh_bndry.shape[0]
+        self.n_ic_pts = self.mesh_t0.shape[0]
 
-    def _setup(self, f_ic, f_bc):
+
+    def setup(self, f_ic, f_bc):
         """
         Sets up various data structures used by the optimizer during the
         training loop (self.train())
         """
+        self.f_ic = f_ic
+        self.f_bc = f_bc
+
         # Compute the initial condition on the training mesh
         self.u_exact_t0 = f_ic(self.mesh_t0)
 
         # Compute the boundary condition on the training mesh if
-        # Dirichlet BCs are being imposed
-        if self.bc = 'dirichlet':
+        # the boundary conditions aren't periodic
+        if self.f_bc is not None:
             self.u_exact_bndry = f_bc(self.mesh_bndry)
 
 
@@ -419,15 +505,24 @@ class MeshBasedOptimizer(PINN_Optimizer):
 
         RETURNS
 
-            bndry_pts   :       (2P, self.d+1)-Torch tensor. Points at which the
+            bndry_pts   :       (P, self.d+1)-Torch tensor. Points at which the
                                   periodic BC residuals will be evaluated.
-                                These are pairs t0_points[i] = [t[i]; x[i]],
-                                  where position x[i] is on the opposite
-                                  boundary from position x[i+P].
-                                For instance, in the 1d case, x[i] = 0 and
-                                  x[i+P] = 1.
+                                  These are pairs
+                                        bndry_pts[i] = [t[i]; x_bndry[i]]
+
+            opp_pts     :       (P, self.d+1)-Torch tensor. Points at which are
+                                  on the boundary opposite from 'bndry_pts'
+                                  These are pairs
+                                        opp_pts[i] = [t[i]; x_opp[i]],
+                                  where position x_opp[i] is on the opposite
+                                  boundary from position x_bndry[i].
+                                For instance, in the 1d case, if
+                                    x_bndry[i] = 0 then x_opp[i] = 1.
         """
-        return self.mesh_bndry
+        return (
+            self.mesh_bndry[:self.n_bc_pts//2],
+            self.mesh_bndry[self.n_bc_pts//2:]
+        )
 
 
     def next_interior_points(self, *args, **kwargs):
@@ -444,7 +539,7 @@ class MeshBasedOptimizer(PINN_Optimizer):
 
             interior_pts   :   (# points, self.d+1)-Torch tensor. Points at
                                 which the PDE residuals will be evaluated.
-                                These are pairs t0_points[i] = [t[i]; x[i]]
+                                These are pairs interior_pts[i] = [t[i]; x[i]]
         """
         return self.mesh_interior
 
@@ -453,20 +548,33 @@ class MeshBasedOptimizer(PINN_Optimizer):
 --------------------------------------------------------------------------------
     Mesh Free Optimizer
 
-TODO: the entire class still needs to be implemented 
+TODO: add option for error based sampling
 --------------------------------------------------------------------------------
 """
+# Sampling Imports
+from .sampling import *
+
 class MeshFreeOptimizer(PINN_Optimizer):
     """
     ----------------------------------------------------------------------------
         Setup functions
     ----------------------------------------------------------------------------
     """
-    def __init__(self, nt, nx, d=1, T=1):
+    def __init__(self, n_pde_pts=None, n_bc_pts=None, n_ic_pts=None, d=1, T=1):
         """
         ARGUMENTS
 
-            # TODO: figure out
+            n_pde_pts    :  Number of interior mesh points used to compute
+                            the PDE loss on each iteration
+                            Default: 2^(d+1), where d is # of spatial dimensions
+
+            n_bc_pts     :  Number of boundary points used to compute the
+                            boundary condition loss on each iterations
+                            Default: 2^d
+
+            n_ic_pts     :  Number of points used to the compute the initial
+                            condition loss on each iterations
+                            Default: 2^d
 
             d        :  Int. Spatial dimension
                         Default: 1
@@ -475,30 +583,32 @@ class MeshFreeOptimizer(PINN_Optimizer):
             T        :  Float. Sets time domain to [0,T]
                         Default: 1
         """
-        self.nt = nt
-        self.nx = nx
         self.d = d
         self.T = T
 
-        # Create the training mesh
-        mesh = generate_mesh(nt, nx, d, T)
-        self.mesh_t0, self.mesh_bndry, self.mesh_interior = mesh
-        # Set the interior points to requires grad
-        self.mesh_interior.requires_grad = True
+         # Number of pde / boundary/ t0 training points
+        if n_pde_pts is None:
+            n_pde_pts = 2 ** (d+1)
+        if n_bc_pts is None:
+            n_bc_pts = 2 ** d
+        if n_ic_pts is None:
+            n_ic_pts = 2 ** d
+        self.n_pde_pts = n_pde_pts
+        self.n_bc_pts = n_bc_pts
+        self.n_ic_pts = n_ic_pts
 
 
-    def _setup(self, f_ic, f_bc):
+    def setup(self, f_ic, f_bc):
         """
         Sets up various data structures used by the optimizer during the
         training loop (self.train())
         """
-        # Compute the initial condition on the training mesh
-        self.u_exact_t0 = f_ic(self.mesh_t0)
-
-        # Compute the boundary condition on the training mesh if
-        # Dirichlet BCs are being imposed
-        if self.bc = 'dirichlet':
-            self.u_exact_bndry = f_bc(self.mesh_bndry)
+        # Save the functions for computing the initial condition and
+        # boundary condition.
+        # We will need these later, specifically in 'next_t0_condition'
+        # and 'next_boundary_condition'
+        self.f_ic = f_ic
+        self.f_bc = f_bc
 
 
     """
@@ -525,7 +635,10 @@ class MeshFreeOptimizer(PINN_Optimizer):
             u_exact_t0      :   (# points, 1)-Torch tensor. Initial condition at
                                 t=t[i], x=x[i]
         """
-        return self.mesh_t0, self.u_exact_t0
+        # Sample 'self.n_ic_pts' points from the t = 0 boundary
+        t0_pts = sample_t0_points(self.n_ic_pts, self.d, self.T)
+        # Return the initial condition
+        return t0_pts, self.f_ic(t0_pts)
 
 
     def next_boundary_condition(self, *args, **kwargs):
@@ -547,7 +660,15 @@ class MeshFreeOptimizer(PINN_Optimizer):
             u_exact_t0      :   (# points, 1)-Torch tensor. Initial condition at
                                 t=t[i], x=x[i]
         """
-        return self.mesh_boundary, self.u_exact_bndry
+        # Verify this function isn't being called for periodic boundary conditions
+        if self.f_bc is None:
+            raise ValueError(
+                'f_bc should not be None when next_boundary_condition() is called'
+            )
+        # Sample 'self.n_bc_pts' points from the t = 0 boundary
+        bndry_pts = sample_boundary_points(self.n_bc_pts, self.d, self.T)
+        # Return the boundary condition
+        return bndry_pts, self.f_bc(bndry_pts)
 
 
     def next_boundary_pairs(self, *args, **kwargs):
@@ -563,15 +684,28 @@ class MeshFreeOptimizer(PINN_Optimizer):
 
         RETURNS
 
-            bndry_pts   :       (2P, self.d+1)-Torch tensor. Points at which the
+            bndry_pts   :       (P, self.d+1)-Torch tensor. Points at which the
                                   periodic BC residuals will be evaluated.
-                                These are pairs t0_points[i] = [t[i]; x[i]],
-                                  where position x[i] is on the opposite
-                                  boundary from position x[i+P].
-                                For instance, in the 1d case, x[i] = 0 and
-                                  x[i+P] = 1.
+                                  These are pairs
+                                        bndry_pts[i] = [t[i]; x_bndry[i]]
+
+            opp_pts     :       (P, self.d+1)-Torch tensor. Points at which are
+                                  on the boundary opposite from 'bndry_pts'
+                                  These are pairs
+                                        opp_pts[i] = [t[i]; x_opp[i]],
+                                  where position x_opp[i] is on the opposite
+                                  boundary from position x_bndry[i].
+                                For instance, in the 1d case, if
+                                    x_bndry[i] = 0 then x_opp[i] = 1.
         """
-        return self.mesh_bndry
+        # Verify this function isn't being called for non periodic boundary
+        # conditions
+        if self.f_bc is not None:
+            raise ValueError(
+                'f_bc should be None when next_boundary_pairs() is called'
+            )
+        # Otherwise, sample pairs of points from the boundary
+        return sample_boundary_pairs(self.n_bc_pts, self.d, self.T)
 
 
     def next_interior_points(self, *args, **kwargs):
@@ -588,198 +722,9 @@ class MeshFreeOptimizer(PINN_Optimizer):
 
             interior_pts   :   (# points, self.d+1)-Torch tensor. Points at
                                 which the PDE residuals will be evaluated.
-                                These are pairs t0_points[i] = [t[i]; x[i]]
+                                These are pairs
+                                        interior_pts[i] = [t[i]; x[i]]
         """
-        return self.mesh_interior
-
-
-
-
-def train_mesh_free(network, f_pde, f_ic, n_pde_pts, n_bc_pts, n_ic_pts,
-        alpha=None, n_iters=1000, lr=1e-3, verbose=None, u_exact=None,
-        make_pred_figs=None, fig_dir='./figures/mesh-free', fig_fname='transport',
-        fig_mesh_size=None
-    ):
-    """
-    ARGUMENTS
-
-        network      :  FCN network to be trained
-
-        f_pde        :  Callable. Function that computes the partial derivative based
-                        quantity that should be minimized
-
-        f_ic         :  Callable. Function that computes the initial condition
-                        for the PDE that the NN is being trained to solve
-
-        n_pde_pts    :  Number of interior mesh points used to compute
-                        the PDE loss on each iteration
-                        Default: 2^(d+1), where d is # of spatial dimensions
-
-        n_bc_pts     :  Number of boundary points used to compute the
-                        boundary condition loss on each iterations
-                        Default: 2^d
-
-        n_ic_pts     :  Number of points used to the compute the initial
-                        condition loss on each iterations
-                        Default: 2^d
-
-        alpha        :  Tuple. Sets the scaling of the three
-                        terms in the loss function
-
-                        L = alpha[0] L_pde + alpha[1] * L_ic
-
-                        Default: [1,1]
-
-        n_iters      :  Number of training iterations
-                        Default: 1000
-
-        lr           :  Learning rate
-                        Default: 1e-3
-
-        u_exact      :  None or Callable function that computes the exact
-                        solution given any point in the domain
-                        Default: None
-
-        make_pred_figs      :   None or Int.
-                                Set to Int to set the rate at which to
-                                    generate and save figures visualizing
-                                    the NNs predictions and errors.
-                                    Requires 'u_exact' to not be None
-                                Set to None to not create such figures.
-                                Default: None
-
-        fig_dir      :  String. Path to directory where training visualizations
-                        should be saved.
-                        Default: './figures'
-
-        fig_fname    :  String. Figures generated by this method will have
-                        the filenames of the form 'save_fig_fname_iter%d.png'
-
-        fig_mesh_size   : Tuple (n_t_viz, n_x_viz) setting the mesh size used when
-                          generating the visualizations of the networks predictions.
-                          Set to None to use (n_t, n_x)
-                          Default: None
-
-    RETURNS
-
-        L_pde
-
-        L_bc
-
-        L_ic
-
-        L_train
-
-        L2_err
-    """
-    d = 1 # Method works only for d = 1 right now
-
-    # Number of pde / boundary/ t0 training points
-    if n_pde_pts is None:
-        n_pde_pts = 2 ** (d+1)
-    if n_bc_pts is None:
-        n_bc_pts = 2 ** d
-    if n_ic_pts is None:
-        n_ic_pts = 2 ** d
-
-    # Loss coefs alpha[i]
-    if alpha is None:
-        alpha = np.array([1,1,1]) / 3
-    alpha = np.array(alpha, dtype=float)
-
-    # Create the optimizer
-    optimizer = torch.optim.Adam(network.parameters(),lr=lr)
-
-    # Object to compute MSE loss
-    mse_loss = nn.MSELoss()
-
-    # Arrays to store the losses
-    L_pde = np.zeros(n_iters)    # PDE loss
-    L_bc = np.zeros(n_iters)     # Initial condition loss
-    L_ic = np.zeros(n_iters)     # Initial condition loss
-    L_train = np.zeros(n_iters)  # Overall training loss
-    if u_exact is not None:
-        L2_err = np.zeros(n_iters)  # L2-error on exact solution
-
-    # TODO: figure out what to do in terms of the L2 error
-
-    # Training loop
-    for i in range(n_iters):
-        # Clear the parameter gradients
-        optimizer.zero_grad()
-
-        # Initial condition loss
-        # Generate 'n_ic_pts' points with t = 0
-        mesh_t0 = sample_t0_points(n_ic_pts, d)
-        # Compute the initial condition at these points
-        u_exact_t0 = f_ic(mesh_t0)
-        # Compute the network's predictons for mesh_t0
-        u_net_t0 = network(mesh_t0)
-        # Initial condition loss
-        L_ic_i = mse_loss(u_exact_t0, u_net_t0)
-        L_ic[i] = L_ic_i.detach()
-
-        # Periodic BC Loss
-        # Generate 'n_bc_pts' points from the spatial boundary
-        bndry_pts, opp_bndry_pts = sample_boundary_pairs(n_bc_pts, d)
-        u_net_bndry = network(bndry_pts)
-        u_net_opp_bndry = network(opp_bndry_pts)
-        L_bc_i = mse_loss(u_net_bndry, u_net_opp_bndry)
-        L_bc[i] = L_bc_i.detach()
-
-        # PDE loss
-        # Generate 'n_pde_pts' points from the interior of the
-        # spatial temporal domain
-        mesh_interior = sample_interior_points(n_pde_pts, d)
-        mesh_interior.requires_grad = True
-        # Compute the NN's output at the interior points
-        u_net_interior = network(mesh_interior)
-        # Compute the NN's PDE loss
-        L_pde_i = f_pde(mesh_interior, u_net_interior).square().mean()
-        L_pde[i] = L_pde_i.detach()
-
-        # L2 Error on exact solution
-        if u_exact is not None:
-            # Compute the network's L2 error on these points
-            L2_err[i] = np.sqrt(
-                mse_loss(u_exact_interior, u_net_interior.detach())
-            )
-
-        # Overall loss
-        L_train_i = alpha[0] * L_pde_i + alpha[1] * L_bc_i + alpha[2] * L_ic_i
-        L_train[i] = L_train_i.detach()
-
-        # Update the network's parameter
-        L_train_i.backward()
-        optimizer.step()
-
-        # Progress update
-        if verbose and ((i == 0) or ((i+1) % verbose) == 0):
-            fmt_str = 'Iter %d/%d, Losses: PDE=%.2e  BC=%.2e  IC=%.2e  TR=%.2e'
-            msg = fmt_str % (i+1, n_iters, L_pde_i, L_bc_i, L_ic_i, L_train_i)
-            if u_exact is not None:
-                msg += ' L2-err: %.2e' % L2_err[i]
-            print(msg)
-
-        # Save visualization of network predictions
-        if make_pred_figs and ((i == 0) or ((i+1) % make_pred_figs) == 0):
-            # Make the figure
-            fig, axs = visualize_predictions(
-                network, u_exact, n_t_viz, n_x_viz,
-                suptitle='Training Iteration %d' % (i+1),
-                f_pde=f_pde, plot_types=['pred', 'pde_res', 'res']
-            )
-            # Save to file
-            plt.savefig(
-                '%s/%s_iter%d.png' % (fig_dir, fig_fname, i+1),
-                facecolor='white', transparent=False
-            )
-            # Close the figure
-            plt.close()
-
-
-    # Return the loss arrays as np arrays
-    losses = [L_pde, L_bc, L_ic, L_train]
-    if u_exact is not None:
-        losses.append(L2_err)
-    return losses
+        interior_pts = sample_interior_points(self.n_pde_pts, self.d, self.T)
+        interior_pts.requires_grad = True
+        return interior_pts

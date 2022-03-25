@@ -104,5 +104,5 @@ def u_exact_transport(v, a=1, f=None):
     if f is None:
         f = lambda x: torch.cos(2 * torch.pi * x)
     # Compute the exact solution
-    x_t = s[:,1] - s[:,0]
+    x_t = v[:,1] - a * v[:,0]
     return f(x_t).view(-1,1)
