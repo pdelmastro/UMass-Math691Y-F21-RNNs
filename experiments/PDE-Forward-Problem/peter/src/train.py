@@ -144,7 +144,7 @@ class PINN_Optimizer(object):
             used by the error based sampling method to update its internal
             state
 
-        Does nothing for the mesh based optimizer, which is the defauled defined
+        Does nothing for the mesh based optimizer, which is the default defined
         here in PINN_Optimizer
         """
         pass
@@ -245,9 +245,9 @@ class PINN_Optimizer(object):
                             Only returned when 'f_u_exact' is not None
 
         TODO
-        - Add option to control time T
+        - Add (cosine) learning rate scheduler
         - Add option to set initial condition for u_t (needed for wave eqn)
-        - Add cosine learning rate scheduler
+        - Option to control time T and dimension d
         """
         # Loss coefs alpha[i]
         if alpha is None:
@@ -548,7 +548,10 @@ class MeshBasedOptimizer(PINN_Optimizer):
 --------------------------------------------------------------------------------
     Mesh Free Optimizer
 
-TODO: add option for error based sampling
+TODOs:
+- Error based sampling method, with parameter to control exploration /
+  exploitation
+- Sampling distribution that depends on time
 --------------------------------------------------------------------------------
 """
 # Sampling Imports
