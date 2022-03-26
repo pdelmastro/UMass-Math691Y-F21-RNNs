@@ -26,6 +26,28 @@ def compute_u_vv(v, u_v):
 
 """
 --------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+"""
+from scipy.stats import vonmises
+
+def f_ic_von_Mises(v, kappa=4):
+    """
+    von-Mises distribution on the spatial domain [0,1]
+    Only works for d = 1
+
+    s[i] = t[i], x[i]
+    """
+    if len(v.shape) > 1:
+        x = v[:,1:]
+    else:
+        x = v
+    u_t = vonmises.pdf((2*x-1)*torch.pi, kappa)
+    return torch.from_numpy(u_t)
+
+
+"""
+--------------------------------------------------------------------------------
     Transport
 --------------------------------------------------------------------------------
 """

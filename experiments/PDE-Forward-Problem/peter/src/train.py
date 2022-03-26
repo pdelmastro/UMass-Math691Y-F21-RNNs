@@ -344,11 +344,7 @@ class PINN_Optimizer(object):
 
             # Post-iteration updated based on the losses
             # This functionality is used by the error-based training algorithm
-            # self.step(
-            #     # TODO: figure out what to pass here
-            #     # Will need to include the residuals res_XX_i, but what
-            #     # else needs to be included?
-            # )
+            self.step(res_ic_i.detach(), res_bc_i.detach(), res_pde_i.detach())
 
             # Progress update
             if verbose and ((i == 0) or ((i+1) % verbose) == 0):
@@ -563,7 +559,9 @@ class MeshFreeOptimizer(PINN_Optimizer):
         Setup functions
     ----------------------------------------------------------------------------
     """
-    def __init__(self, n_pde_pts=None, n_bc_pts=None, n_ic_pts=None, d=1, T=1):
+    def __init__(self, n_pde_pts=None, n_bc_pts=None, n_ic_pts=None, d=1, T=1,
+            error_based=False, p_exploit=0.5
+        ):
         """
         ARGUMENTS
 
@@ -585,6 +583,15 @@ class MeshFreeOptimizer(PINN_Optimizer):
 
             T        :  Float. Sets time domain to [0,T]
                         Default: 1
+
+            error_based   :     Flag. Set to True to perform error based
+                                sampling
+                                Default: False
+
+            p_exploit     :     Float in [0,1]. Controls the proportion of
+                                points saved from the previous training
+                                iterations, based on their error
+                                Default: 0.5
         """
         self.d = d
         self.T = T
@@ -600,6 +607,18 @@ class MeshFreeOptimizer(PINN_Optimizer):
         self.n_bc_pts = n_bc_pts
         self.n_ic_pts = n_ic_pts
 
+        self.t0_pts = None
+        self.bndry_pts = None
+        self.bndry_pairs = None
+        self.interior_pts = None
+
+        # Error based sampling parameters
+        self.error_based = error_based
+        self.p_exploit = p_exploit
+        self.res_ic  = None   # Variables to store the
+        self.res_bc  = None   # residuals associated with
+        self.res_pde = None   # each region of the domain
+
 
     def setup(self, f_ic, f_bc):
         """
@@ -613,12 +632,49 @@ class MeshFreeOptimizer(PINN_Optimizer):
         self.f_ic = f_ic
         self.f_bc = f_bc
 
-
     """
     ----------------------------------------------------------------------------
         Domain Sampling Functions
     ----------------------------------------------------------------------------
     """
+    def sampling_helper(self, n_samples, curr_samples, residuals, sampling_method):
+        """
+        General idea
+        - given list of existing elements and their associated errors
+        - select the ones with the highest error
+        - generate the remaining points
+        """
+        # If 'samples' is None or error based sampling is disabled,
+        # simply generate a fresh sample
+        if curr_samples is None or not self.error_based or self.p_exploit <= 0:
+            return sampling_method(n_samples, self.d, self.T)
+
+        # Select the points with the highest error
+        n_exploit = int(self.p_exploit * n_samples)
+        exploit_inds = torch.topk(
+            torch.abs(residuals), n_exploit, dim=0
+        ).indices.view(-1)
+
+        # Generate the remaining points
+        new_samples = sampling_method(n_samples - n_exploit, self.d, self.T)
+
+        # Combine the exploited and explore points
+        # Case 1: Pairs of points from PBC
+        if isinstance(curr_samples, tuple):
+            combined_samples = tuple(
+                torch.vstack((curr[exploit_inds], new))
+                for curr, new in zip(curr_samples, new_samples)
+            )
+        # Case 2: Tensors
+        else:
+            combined_samples = torch.vstack(
+                (curr_samples[exploit_inds].detach(), new_samples)
+            )
+
+        # Return
+        return combined_samples
+
+
     def next_t0_condition(self, *args, **kwargs):
         """
         Returns a tuple of data used for evaluating the initial condition
@@ -638,10 +694,15 @@ class MeshFreeOptimizer(PINN_Optimizer):
             u_exact_t0      :   (# points, 1)-Torch tensor. Initial condition at
                                 t=t[i], x=x[i]
         """
-        # Sample 'self.n_ic_pts' points from the t = 0 boundary
-        t0_pts = sample_t0_points(self.n_ic_pts, self.d, self.T)
-        # Return the initial condition
-        return t0_pts, self.f_ic(t0_pts)
+        # Generate the sample
+        self.t0_pts = self.sampling_helper(
+            self.n_ic_pts, self.t0_pts, self.res_ic,
+            sampling_method=sample_t0_points
+        )
+
+        # Compute and return the full initial condition
+        self.u_exact_t0 = self.f_ic(self.t0_pts)
+        return self.t0_pts, self.u_exact_t0
 
 
     def next_boundary_condition(self, *args, **kwargs):
@@ -668,10 +729,16 @@ class MeshFreeOptimizer(PINN_Optimizer):
             raise ValueError(
                 'f_bc should not be None when next_boundary_condition() is called'
             )
-        # Sample 'self.n_bc_pts' points from the t = 0 boundary
-        bndry_pts = sample_boundary_points(self.n_bc_pts, self.d, self.T)
-        # Return the boundary condition
-        return bndry_pts, self.f_bc(bndry_pts)
+
+        # Generate the sample
+        self.bndry_pts = self.sampling_helper(
+            self.n_bc_pts, self.bndry_pts, self.res_bc,
+            sampling_method=sample_boundary_points
+        )
+
+        # Compute and return the full initial condition
+        self.u_exact_bndry = self.f_ic(self.bndry_pts)
+        return self.bndry_pts, self.u_exact_bndryW
 
 
     def next_boundary_pairs(self, *args, **kwargs):
@@ -707,8 +774,13 @@ class MeshFreeOptimizer(PINN_Optimizer):
             raise ValueError(
                 'f_bc should be None when next_boundary_pairs() is called'
             )
+
         # Otherwise, sample pairs of points from the boundary
-        return sample_boundary_pairs(self.n_bc_pts, self.d, self.T)
+        self.bndry_pairs = self.sampling_helper(
+            self.n_bc_pts, self.bndry_pairs, self.res_bc,
+            sampling_method=sample_boundary_pairs
+        )
+        return self.bndry_pairs
 
 
     def next_interior_points(self, *args, **kwargs):
@@ -728,6 +800,26 @@ class MeshFreeOptimizer(PINN_Optimizer):
                                 These are pairs
                                         interior_pts[i] = [t[i]; x[i]]
         """
-        interior_pts = sample_interior_points(self.n_pde_pts, self.d, self.T)
-        interior_pts.requires_grad = True
-        return interior_pts
+        # Sample points from the interior of the domain
+        self.interior_pts = self.sampling_helper(
+            self.n_pde_pts, self.interior_pts, self.res_pde,
+            sampling_method=sample_interior_points
+        )
+        self.interior_pts.requires_grad = True
+        return self.interior_pts
+
+    """
+    ----------------------------------------------------------------------------
+        Training Functions
+    ----------------------------------------------------------------------------
+    """
+
+    def step(self, res_ic, res_bc, res_pde):
+        """
+        This is the function called at the end of each iteration in the training
+        loop. It allows the optimizer to base it's samples on the residuals on
+        the different regions of the mesh.
+        """
+        self.res_ic = res_ic
+        self.res_bc = res_bc
+        self.res_pde = res_pde
