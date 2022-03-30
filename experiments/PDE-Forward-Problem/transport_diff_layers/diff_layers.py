@@ -611,8 +611,8 @@ seed_list = [1,10,100,1000,10000,100000,200000,300000,400000,1000000]
 Iterating through each number of layers, the number of neurons in each layer and the seed.
 '''
 # Training parameters
-nt = 50
-nx = 20
+nt = 100
+nx = 100
 alpha = np.array([1,1.5,1])       # Relative importance of pde / bc / ic loss
 n_iters = 900     # Number of training iterations
 lr = 1e-3          # Learning rate
@@ -633,7 +633,7 @@ for layers in tqdm(layer_list):
             # print(fig_dir_b)
             # /Users/dvirblander/Desktop/Fall 2021/Research Project Fall Semester/UMass-Math691Y-F21-RNNs/experiments/PDE-Forward-Problem/transport_diff_layers/figures/transport
             fig_dir = '/Users/dvirblander/Desktop/Fall 2021/Research Project Fall Semester/UMass-Math691Y-F21-RNNs/experiments/PDE-Forward-Problem/transport_diff_layers/figures/transport'
-            fig_fname='transport for '+str(layers) + 'layers, ' + str(neurons) + ' per layer, and ' + str(seed) + 'seed'
+            fig_fname='transport for '+str(layers) + 'layers, ' + str(neurons) + ' per layer, and ' + str(seed) + 'seed on ' +str(nx)+' by '+str(nx)+' mesh'
             fig_mesh_size=(50,50)
             # Set the random seed for reproducibility
             seed = int(seed)
